@@ -452,6 +452,14 @@
                     <label>Contraste:</label>
                     <input type="range" id="contrast" min="50" max="150" value="100">
                 </div>
+                <div class="control-group">
+                    <label>✂️ Arriba:</label>
+                    <input type="range" id="cropTop" min="0" max="40" value="0">
+                </div>
+                <div class="control-group">
+                    <label>✂️ Abajo:</label>
+                    <input type="range" id="cropBottom" min="0" max="40" value="0">
+                </div>
                 <button onclick="resetControls()">🔄 Restablecer</button>
             </div>
             
@@ -651,6 +659,8 @@
             
             document.getElementById('brightness').addEventListener('input', renderImage);
             document.getElementById('contrast').addEventListener('input', renderImage);
+            document.getElementById('cropTop').addEventListener('input', renderImage);
+            document.getElementById('cropBottom').addEventListener('input', renderImage);
             
             document.addEventListener('keydown', (e) => {
                 if (e.key === 'ArrowRight') nextImage();
@@ -840,30 +850,52 @@
             const { pixelData, width, height } = currentImageData;
             const brightness = document.getElementById('brightness').value / 100;
             const contrast = document.getElementById('contrast').value / 100;
+            const cropTopPercent = document.getElementById('cropTop').value / 100;
+            const cropBottomPercent = document.getElementById('cropBottom').value / 100;
             
-            const imageData = ctx.createImageData(width, height);
+            // Calcular región de recorte
+            const cropTopPixels = Math.floor(height * cropTopPercent);
+            const cropBottomPixels = Math.floor(height * cropBottomPercent);
+            const croppedHeight = height - cropTopPixels - cropBottomPixels;
+            
+            if (croppedHeight <= 0) return;
+            
+            // Ajustar canvas para mantener proporción
+            canvas.width = width;
+            canvas.height = croppedHeight;
+            
+            const imageData = ctx.createImageData(width, croppedHeight);
             const data = imageData.data;
             
-            let min = pixelData[0];
-            let max = pixelData[0];
-            for (let i = 0; i < pixelData.length; i++) {
-                if (pixelData[i] < min) min = pixelData[i];
-                if (pixelData[i] > max) max = pixelData[i];
+            // Encontrar min/max en la región recortada
+            let min = pixelData[cropTopPixels * width];
+            let max = pixelData[cropTopPixels * width];
+            
+            for (let y = cropTopPixels; y < height - cropBottomPixels; y++) {
+                for (let x = 0; x < width; x++) {
+                    const idx = y * width + x;
+                    if (pixelData[idx] < min) min = pixelData[idx];
+                    if (pixelData[idx] > max) max = pixelData[idx];
+                }
             }
             
             const range = max - min || 1;
             
-            for (let i = 0; i < pixelData.length; i++) {
-                let value = (pixelData[i] - min) / range;
-                value = ((value - 0.5) * contrast + 0.5) * brightness;
-                value = Math.max(0, Math.min(1, value));
-                
-                const pixelValue = Math.round(value * 255);
-                const idx = i * 4;
-                data[idx] = pixelValue;
-                data[idx + 1] = pixelValue;
-                data[idx + 2] = pixelValue;
-                data[idx + 3] = 255;
+            // Renderizar solo la región recortada
+            for (let y = 0; y < croppedHeight; y++) {
+                for (let x = 0; x < width; x++) {
+                    const srcIdx = (y + cropTopPixels) * width + x;
+                    let value = (pixelData[srcIdx] - min) / range;
+                    value = ((value - 0.5) * contrast + 0.5) * brightness;
+                    value = Math.max(0, Math.min(1, value));
+                    
+                    const pixelValue = Math.round(value * 255);
+                    const dstIdx = (y * width + x) * 4;
+                    data[dstIdx] = pixelValue;
+                    data[dstIdx + 1] = pixelValue;
+                    data[dstIdx + 2] = pixelValue;
+                    data[dstIdx + 3] = 255;
+                }
             }
             
             ctx.putImageData(imageData, 0, 0);
