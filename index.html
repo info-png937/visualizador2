@@ -254,6 +254,47 @@
             text-align: center;
         }
         
+        .slider-container {
+            padding: 0 20px;
+            margin-bottom: 20px;
+        }
+        
+        .image-slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 5px;
+            background: linear-gradient(90deg, #e0e0e0 0%, #667eea 100%);
+            outline: none;
+            opacity: 0.9;
+            transition: opacity 0.2s;
+            cursor: pointer;
+        }
+        
+        .image-slider:hover {
+            opacity: 1;
+        }
+        
+        .image-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+        }
+        
+        .image-slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5);
+        }
+        
         .error {
             padding: 40px;
             text-align: center;
@@ -267,6 +308,16 @@
             
             .control-group {
                 width: 100%;
+            }
+            
+            .navigation {
+                flex-wrap: wrap;
+            }
+            
+            .image-counter {
+                width: 100%;
+                order: -1;
+                margin-bottom: 10px;
             }
         }
     </style>
@@ -308,6 +359,10 @@
                 <button class="nav-button" onclick="previousImage()">◀</button>
                 <div class="image-counter" id="imageCounter">Corte 1 / 1</div>
                 <button class="nav-button" onclick="nextImage()">▶</button>
+            </div>
+            
+            <div class="slider-container">
+                <input type="range" id="imageSlider" min="0" max="0" value="0" class="image-slider">
             </div>
             
             <div class="viewer-container">
@@ -477,6 +532,15 @@
             currentImageIndex = 0;
             loadImage(currentImageIndex);
             
+            // Configurar slider
+            const imageSlider = document.getElementById('imageSlider');
+            imageSlider.max = seriesData[currentSeries].totalCount - 1;
+            imageSlider.value = 0;
+            imageSlider.addEventListener('input', (e) => {
+                currentImageIndex = parseInt(e.target.value);
+                loadImage(currentImageIndex);
+            });
+            
             document.getElementById('brightness').addEventListener('input', renderImage);
             document.getElementById('contrast').addEventListener('input', renderImage);
             
@@ -496,6 +560,11 @@
                     btn.classList.add('active');
                 }
             });
+            
+            // Actualizar slider para nueva serie
+            const imageSlider = document.getElementById('imageSlider');
+            imageSlider.max = seriesData[currentSeries].totalCount - 1;
+            imageSlider.value = 0;
             
             loadImage(currentImageIndex);
         }
@@ -730,9 +799,10 @@
         
         function updateCounter() {
             const series = seriesData[currentSeries];
-            const cached = Object.keys(series.loadedImages).length;
             document.getElementById('imageCounter').textContent = 
                 `Corte ${currentImageIndex + 1} / ${series.totalCount}`;
+            // Actualizar slider
+            document.getElementById('imageSlider').value = currentImageIndex;
         }
         
         function nextImage() {
