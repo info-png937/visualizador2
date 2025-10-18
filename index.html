@@ -304,66 +304,25 @@
             for (const seriesName of series) {
                 dicomFiles[seriesName] = [];
                 
-                // Intentar cargar hasta 200 archivos por serie
-                for (let i = 1; i <= 200; i++) {
-                    const paddedNum = String(i).padStart(6, '0');
-                    const possibleNames = [
-                        `${basePath}/${seriesName}/IM${paddedNum}`,
-                        `${basePath}/${seriesName}/IM${paddedNum}.dcm`,
-                        `${basePath}/${seriesName}/${paddedNum}`,
-                        `${basePath}/${seriesName}/${paddedNum}.dcm`,
-                        `${basePath}/${seriesName}/I${paddedNum}`,
-                        `${basePath}/${seriesName}/${i}.dcm`
-                    ];
+                // Cargar archivos con patrón I00001, I00002, etc. hasta I00300
+                for (let i = 1; i <= 300; i++) {
+                    const paddedNum = String(i).padStart(5, '0');
+                    const fileName = `${basePath}/${seriesName}/I${paddedNum}`;
                     
-                    let found = false;
-                    for (const name of possibleNames) {
-                        try {
-                            const response = await fetch(name, { method: 'HEAD' });
-                            if (response.ok) {
-                                dicomFiles[seriesName].push(name);
-                                found = true;
+                    try {
+                        const response = await fetch(fileName, { method: 'HEAD' });
+                        if (response.ok) {
+                            dicomFiles[seriesName].push(fileName);
+                        } else {
+                            // Si no encontramos 5 archivos consecutivos, terminamos
+                            if (i > 5 && dicomFiles[seriesName].length > 0) {
                                 break;
                             }
-                        } catch (e) {
-                            // Archivo no existe, continuar
                         }
-                    }
-                    
-                    // Si no encontramos 3 archivos consecutivos, asumimos que terminó la serie
-                    if (!found && i > 3) {
-                        break;
-                    }
-                }
-                
-                // Si no encontró archivos en esta serie, intentar nombres alternativos
-                if (dicomFiles[seriesName].length === 0) {
-                    const commonPatterns = ['1.dcm', '001.dcm', '0001.dcm'];
-                    for (const pattern of commonPatterns) {
-                        try {
-                            const testPath = `${basePath}/${seriesName}/${pattern}`;
-                            const response = await fetch(testPath, { method: 'HEAD' });
-                            if (response.ok) {
-                                // Encontramos al menos uno, cargar más con este patrón
-                                for (let i = 1; i <= 200; i++) {
-                                    const num = pattern.includes('0001') ? String(i).padStart(4, '0') : 
-                                               pattern.includes('001') ? String(i).padStart(3, '0') : i;
-                                    const path = `${basePath}/${seriesName}/${num}.dcm`;
-                                    try {
-                                        const r = await fetch(path, { method: 'HEAD' });
-                                        if (r.ok) {
-                                            dicomFiles[seriesName].push(path);
-                                        } else {
-                                            break;
-                                        }
-                                    } catch (e) {
-                                        break;
-                                    }
-                                }
-                                break;
-                            }
-                        } catch (e) {
-                            // Continuar
+                    } catch (e) {
+                        // Si no encontramos 5 archivos consecutivos, terminamos
+                        if (i > 5 && dicomFiles[seriesName].length > 0) {
+                            break;
                         }
                     }
                 }
