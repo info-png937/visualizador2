@@ -44,55 +44,70 @@
             font-size: 1.1em;
         }
         
-        .upload-section {
-            padding: 40px;
+        .loading {
+            padding: 60px;
             text-align: center;
         }
         
-        .upload-box {
-            border: 3px dashed #667eea;
-            border-radius: 10px;
-            padding: 60px;
-            background: #f8f9ff;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .upload-box:hover {
-            background: #eef1ff;
-            border-color: #764ba2;
-            transform: translateY(-2px);
-        }
-        
-        .upload-box.dragover {
-            background: #e0e7ff;
-            border-color: #4f46e5;
-        }
-        
-        .upload-icon {
+        .loading-icon {
             font-size: 4em;
-            margin-bottom: 20px;
+            animation: spin 2s linear infinite;
         }
         
-        .upload-text {
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
             font-size: 1.3em;
             color: #333;
-            margin-bottom: 10px;
-        }
-        
-        .upload-hint {
-            color: #666;
-            font-size: 0.95em;
-            margin-bottom: 20px;
-        }
-        
-        input[type="file"] {
-            display: none;
+            margin-top: 20px;
         }
         
         .viewer-section {
             display: none;
             padding: 30px;
+        }
+        
+        .series-selector {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .series-selector h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        
+        .series-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .series-btn {
+            background: white;
+            border: 2px solid #667eea;
+            color: #667eea;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .series-btn:hover {
+            background: #eef1ff;
+        }
+        
+        .series-btn.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-color: #667eea;
         }
         
         .controls {
@@ -181,6 +196,7 @@
             font-weight: 600;
             color: #333;
             font-size: 1.1em;
+            word-break: break-word;
         }
         
         .navigation {
@@ -200,44 +216,26 @@
             align-items: center;
             justify-content: center;
             font-size: 1.5em;
+            border: none;
+            cursor: pointer;
         }
         
         .image-counter {
             font-size: 1.2em;
             font-weight: 600;
             color: #333;
-            min-width: 120px;
+            min-width: 150px;
             text-align: center;
         }
         
-        .status {
+        .error {
+            padding: 40px;
             text-align: center;
-            padding: 15px;
-            margin: 10px 0;
-            border-radius: 8px;
-            display: none;
-        }
-        
-        .status.error {
-            background: #fee;
             color: #c00;
-            display: block;
-        }
-        
-        .status.success {
-            background: #efe;
-            color: #060;
-            display: block;
-        }
-        
-        .status.info {
-            background: #eef;
-            color: #006;
-            display: block;
         }
         
         @media (max-width: 768px) {
-            .controls {
+            .controls, .series-buttons {
                 flex-direction: column;
             }
             
@@ -254,17 +252,17 @@
             <p>Herramienta profesional para revisión de imágenes médicas</p>
         </div>
         
-        <div class="upload-section" id="uploadSection">
-            <div class="upload-box" id="uploadBox">
-                <div class="upload-icon">📁</div>
-                <div class="upload-text">Haz clic aquí para seleccionar archivos DICOM</div>
-                <div class="upload-hint">O arrastra archivos .dcm aquí - Soporta múltiples archivos</div>
-                <input type="file" id="fileInput" accept=".dcm,.dicom" multiple>
-            </div>
-            <div class="status" id="status"></div>
+        <div class="loading" id="loading">
+            <div class="loading-icon">⏳</div>
+            <div class="loading-text">Cargando imágenes DICOM...</div>
         </div>
         
         <div class="viewer-section" id="viewerSection">
+            <div class="series-selector" id="seriesSelector">
+                <h3>📂 Series Disponibles:</h3>
+                <div class="series-buttons" id="seriesButtons"></div>
+            </div>
+            
             <div class="controls">
                 <div class="control-group">
                     <label>Brillo:</label>
@@ -275,12 +273,11 @@
                     <input type="range" id="contrast" min="50" max="150" value="100">
                 </div>
                 <button onclick="resetControls()">🔄 Restablecer</button>
-                <button onclick="loadNewFiles()">📁 Cargar Nuevos</button>
             </div>
             
             <div class="navigation">
                 <button class="nav-button" onclick="previousImage()">◀</button>
-                <div class="image-counter" id="imageCounter">1 / 1</div>
+                <div class="image-counter" id="imageCounter">Corte 1 / 1</div>
                 <button class="nav-button" onclick="nextImage()">▶</button>
             </div>
             
@@ -294,144 +291,204 @@
 
     <script src="https://unpkg.com/dicom-parser@1.8.13/dist/dicomParser.min.js"></script>
     <script>
-        let images = [];
-        let currentImageIndex = 0;
-        let currentImageData = null;
-        let isLibraryLoaded = false;
-        
-        const uploadBox = document.getElementById('uploadBox');
-        const fileInput = document.getElementById('fileInput');
-        const uploadSection = document.getElementById('uploadSection');
-        const viewerSection = document.getElementById('viewerSection');
-        const canvas = document.getElementById('dicomCanvas');
-        const ctx = canvas.getContext('2d');
-        const statusDiv = document.getElementById('status');
-        
-        // Esperar a que todo se cargue
-        window.addEventListener('load', function() {
-            // Verificar si dicomParser se cargó
-            if (typeof dicomParser !== 'undefined') {
-                isLibraryLoaded = true;
-                showStatus('Listo para cargar archivos DICOM', false, 'info');
-            } else {
-                showStatus('Advertencia: Librería DICOM no disponible. Intentando modo alternativo...', false, 'info');
+        // Auto-detectar archivos DICOM desde GitHub
+        async function autoDetectDicomFiles() {
+            const basePath = 'DICOM/S00001';
+            const series = [
+                'SER00001', 'SER00002', 'SER00003', 'SER00004', 'SER00005',
+                'SER00006', 'SER00007', 'SER00008', 'SER00009', 'SER00010'
+            ];
+            
+            const dicomFiles = {};
+            
+            for (const seriesName of series) {
+                dicomFiles[seriesName] = [];
+                
+                // Intentar cargar hasta 200 archivos por serie
+                for (let i = 1; i <= 200; i++) {
+                    const paddedNum = String(i).padStart(6, '0');
+                    const possibleNames = [
+                        `${basePath}/${seriesName}/IM${paddedNum}`,
+                        `${basePath}/${seriesName}/IM${paddedNum}.dcm`,
+                        `${basePath}/${seriesName}/${paddedNum}`,
+                        `${basePath}/${seriesName}/${paddedNum}.dcm`,
+                        `${basePath}/${seriesName}/I${paddedNum}`,
+                        `${basePath}/${seriesName}/${i}.dcm`
+                    ];
+                    
+                    let found = false;
+                    for (const name of possibleNames) {
+                        try {
+                            const response = await fetch(name, { method: 'HEAD' });
+                            if (response.ok) {
+                                dicomFiles[seriesName].push(name);
+                                found = true;
+                                break;
+                            }
+                        } catch (e) {
+                            // Archivo no existe, continuar
+                        }
+                    }
+                    
+                    // Si no encontramos 3 archivos consecutivos, asumimos que terminó la serie
+                    if (!found && i > 3) {
+                        break;
+                    }
+                }
+                
+                // Si no encontró archivos en esta serie, intentar nombres alternativos
+                if (dicomFiles[seriesName].length === 0) {
+                    const commonPatterns = ['1.dcm', '001.dcm', '0001.dcm'];
+                    for (const pattern of commonPatterns) {
+                        try {
+                            const testPath = `${basePath}/${seriesName}/${pattern}`;
+                            const response = await fetch(testPath, { method: 'HEAD' });
+                            if (response.ok) {
+                                // Encontramos al menos uno, cargar más con este patrón
+                                for (let i = 1; i <= 200; i++) {
+                                    const num = pattern.includes('0001') ? String(i).padStart(4, '0') : 
+                                               pattern.includes('001') ? String(i).padStart(3, '0') : i;
+                                    const path = `${basePath}/${seriesName}/${num}.dcm`;
+                                    try {
+                                        const r = await fetch(path, { method: 'HEAD' });
+                                        if (r.ok) {
+                                            dicomFiles[seriesName].push(path);
+                                        } else {
+                                            break;
+                                        }
+                                    } catch (e) {
+                                        break;
+                                    }
+                                }
+                                break;
+                            }
+                        } catch (e) {
+                            // Continuar
+                        }
+                    }
+                }
             }
             
-            setupEventListeners();
+            // Eliminar series vacías
+            for (const key in dicomFiles) {
+                if (dicomFiles[key].length === 0) {
+                    delete dicomFiles[key];
+                }
+            }
+            
+            return dicomFiles;
+        }
+
+        let seriesData = {};
+        let currentSeries = null;
+        let currentImageIndex = 0;
+        let currentImageData = null;
+        const canvas = document.getElementById('dicomCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        window.addEventListener('load', async function() {
+            try {
+                const dicomFiles = await autoDetectDicomFiles();
+                await loadAllDicomFiles(dicomFiles);
+                initViewer();
+            } catch (err) {
+                showError('Error al cargar las imágenes: ' + err.message);
+            }
         });
         
-        function setupEventListeners() {
-            uploadBox.addEventListener('click', () => {
-                fileInput.click();
+        async function loadAllDicomFiles(dicomFiles) {
+            const loading = document.getElementById('loading');
+            
+            for (const [seriesName, files] of Object.entries(dicomFiles)) {
+                seriesData[seriesName] = [];
+                
+                for (const filePath of files) {
+                    try {
+                        const response = await fetch(filePath);
+                        if (!response.ok) continue;
+                        
+                        const arrayBuffer = await response.arrayBuffer();
+                        const byteArray = new Uint8Array(arrayBuffer);
+                        
+                        let dataSet = null;
+                        if (typeof dicomParser !== 'undefined') {
+                            dataSet = dicomParser.parseDicom(byteArray);
+                        }
+                        
+                        seriesData[seriesName].push({
+                            file: filePath,
+                            dataSet: dataSet,
+                            byteArray: byteArray
+                        });
+                        
+                        loading.querySelector('.loading-text').textContent = 
+                            `Cargando: ${seriesName} (${seriesData[seriesName].length} imágenes)`;
+                        
+                    } catch (err) {
+                        console.error(`Error cargando ${filePath}:`, err);
+                    }
+                }
+            }
+        }
+        
+        function showError(message) {
+            const loading = document.getElementById('loading');
+            loading.innerHTML = `<div class="error"><h2>❌ Error</h2><p>${message}</p><p>Verifica que los archivos DICOM estén en la carpeta correcta</p></div>`;
+        }
+        
+        function initViewer() {
+            if (Object.keys(seriesData).length === 0) {
+                showError('No se encontraron archivos DICOM. Verifica que estén en DICOM/S00001/SER000XX/');
+                return;
+            }
+            
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('viewerSection').style.display = 'block';
+            
+            const seriesButtonsContainer = document.getElementById('seriesButtons');
+            seriesButtonsContainer.innerHTML = '';
+            
+            Object.keys(seriesData).forEach((seriesName, index) => {
+                const btn = document.createElement('button');
+                btn.className = 'series-btn';
+                btn.textContent = `${seriesName} (${seriesData[seriesName].length} cortes)`;
+                btn.onclick = () => loadSeries(seriesName);
+                seriesButtonsContainer.appendChild(btn);
+                
+                if (index === 0) {
+                    currentSeries = seriesName;
+                    btn.classList.add('active');
+                }
             });
             
-            uploadBox.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadBox.classList.add('dragover');
-            });
-            
-            uploadBox.addEventListener('dragleave', () => {
-                uploadBox.classList.remove('dragover');
-            });
-            
-            uploadBox.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadBox.classList.remove('dragover');
-                handleFiles(e.dataTransfer.files);
-            });
-            
-            fileInput.addEventListener('change', (e) => {
-                handleFiles(e.target.files);
-            });
+            currentImageIndex = 0;
+            loadImage(currentImageIndex);
             
             document.getElementById('brightness').addEventListener('input', renderImage);
             document.getElementById('contrast').addEventListener('input', renderImage);
             
             document.addEventListener('keydown', (e) => {
-                if (viewerSection.style.display === 'block') {
-                    if (e.key === 'ArrowRight') nextImage();
-                    if (e.key === 'ArrowLeft') previousImage();
+                if (e.key === 'ArrowRight') nextImage();
+                if (e.key === 'ArrowLeft') previousImage();
+            });
+        }
+        
+        function loadSeries(seriesName) {
+            currentSeries = seriesName;
+            currentImageIndex = 0;
+            
+            document.querySelectorAll('.series-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.textContent.startsWith(seriesName)) {
+                    btn.classList.add('active');
                 }
             });
-        }
-        
-        function showStatus(message, isError = false, type = 'success') {
-            statusDiv.textContent = message;
-            statusDiv.className = 'status ' + (isError ? 'error' : type);
-            if (type !== 'info') {
-                setTimeout(() => {
-                    statusDiv.style.display = 'none';
-                }, 5000);
-            }
-        }
-        
-        function handleFiles(files) {
-            if (files.length === 0) return;
             
-            showStatus('Cargando archivos DICOM...', false, 'info');
-            images = [];
-            let loadedCount = 0;
-            
-            Array.from(files).forEach((file) => {
-                const reader = new FileReader();
-                
-                reader.onload = function(e) {
-                    try {
-                        const arrayBuffer = e.target.result;
-                        const byteArray = new Uint8Array(arrayBuffer);
-                        
-                        let dataSet = null;
-                        if (isLibraryLoaded && typeof dicomParser !== 'undefined') {
-                            dataSet = dicomParser.parseDicom(byteArray);
-                        }
-                        
-                        images.push({
-                            file: file,
-                            dataSet: dataSet,
-                            byteArray: byteArray
-                        });
-                        
-                        loadedCount++;
-                        if (loadedCount === files.length) {
-                            if (images.length > 0) {
-                                currentImageIndex = 0;
-                                initViewer();
-                                showStatus(`${images.length} archivo(s) cargado(s) correctamente`);
-                            } else {
-                                showStatus('No se pudieron cargar los archivos', true);
-                            }
-                        }
-                    } catch (err) {
-                        console.error('Error al procesar archivo:', err);
-                        showStatus(`Error: ${err.message}. ¿Es un archivo DICOM válido?`, true);
-                        loadedCount++;
-                    }
-                };
-                
-                reader.onerror = function() {
-                    showStatus('Error al leer el archivo', true);
-                    loadedCount++;
-                };
-                
-                reader.readAsArrayBuffer(file);
-            });
-        }
-        
-        function initViewer() {
-            uploadSection.style.display = 'none';
-            viewerSection.style.display = 'block';
             loadImage(currentImageIndex);
         }
         
         function readUint16(byteArray, offset) {
             return byteArray[offset] | (byteArray[offset + 1] << 8);
-        }
-        
-        function readUint32(byteArray, offset) {
-            return byteArray[offset] | 
-                   (byteArray[offset + 1] << 8) | 
-                   (byteArray[offset + 2] << 16) | 
-                   (byteArray[offset + 3] << 24);
         }
         
         function findDicomTag(byteArray, tag) {
@@ -454,6 +511,9 @@
         }
         
         function loadImage(index) {
+            const images = seriesData[currentSeries];
+            if (!images || index >= images.length) return;
+            
             const image = images[index];
             const dataSet = image.dataSet;
             const byteArray = image.byteArray;
@@ -462,20 +522,18 @@
                 let width, height, pixelDataOffset, pixelDataLength;
                 
                 if (dataSet) {
-                    // Usar dicomParser si está disponible
                     const pixelDataElement = dataSet.elements.x7fe00010;
                     width = dataSet.uint16('x00280011');
                     height = dataSet.uint16('x00280010');
                     pixelDataOffset = pixelDataElement.dataOffset;
                     pixelDataLength = pixelDataElement.length / 2;
                 } else {
-                    // Modo manual básico
                     const widthTag = findDicomTag(byteArray, 'x00280011');
                     const heightTag = findDicomTag(byteArray, 'x00280010');
                     const pixelDataTag = findDicomTag(byteArray, 'x7fe00010');
                     
                     if (widthTag === -1 || heightTag === -1 || pixelDataTag === -1) {
-                        throw new Error('No se encontraron las etiquetas DICOM necesarias');
+                        throw new Error('Etiquetas DICOM no encontradas');
                     }
                     
                     width = readUint16(byteArray, widthTag + 8);
@@ -500,12 +558,11 @@
                 };
                 
                 renderImage();
-                updateImageInfo(dataSet, width, height, image.file.name);
+                updateImageInfo(dataSet, width, height, image.file);
                 updateCounter();
                 
             } catch (err) {
-                console.error('Error al cargar imagen:', err);
-                showStatus('Error al mostrar la imagen DICOM: ' + err.message, true);
+                console.error('Error:', err);
             }
         }
         
@@ -558,10 +615,16 @@
                 }
             }
             
+            const displayName = filename.split('/').pop();
+            
             info.innerHTML = `
                 <div class="info-item">
+                    <div class="info-label">Serie Actual</div>
+                    <div class="info-value">${currentSeries}</div>
+                </div>
+                <div class="info-item">
                     <div class="info-label">Archivo</div>
-                    <div class="info-value">${filename}</div>
+                    <div class="info-value">${displayName}</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">Dimensiones</div>
@@ -571,19 +634,17 @@
                     <div class="info-label">Modalidad</div>
                     <div class="info-value">${getString('x00080060')}</div>
                 </div>
-                <div class="info-item">
-                    <div class="info-label">Fecha del Estudio</div>
-                    <div class="info-value">${getString('x00080020')}</div>
-                </div>
             `;
         }
         
         function updateCounter() {
+            const images = seriesData[currentSeries];
             document.getElementById('imageCounter').textContent = 
-                `${currentImageIndex + 1} / ${images.length}`;
+                `Corte ${currentImageIndex + 1} / ${images.length}`;
         }
         
         function nextImage() {
+            const images = seriesData[currentSeries];
             if (currentImageIndex < images.length - 1) {
                 currentImageIndex++;
                 loadImage(currentImageIndex);
@@ -601,14 +662,6 @@
             document.getElementById('brightness').value = 100;
             document.getElementById('contrast').value = 100;
             renderImage();
-        }
-        
-        function loadNewFiles() {
-            viewerSection.style.display = 'none';
-            uploadSection.style.display = 'block';
-            images = [];
-            currentImageIndex = 0;
-            currentImageData = null;
         }
     </script>
 </body>
